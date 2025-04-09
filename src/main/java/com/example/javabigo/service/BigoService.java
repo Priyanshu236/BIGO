@@ -2,27 +2,18 @@ package com.example.javabigo.service;
 
 import com.example.javabigo.Payload;
 
-import java.util.AbstractMap;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class BigoService {
 
-    private final ConcurrentHashMap<String, AbstractMap.SimpleEntry<Integer, Payload>> dataStore = new ConcurrentHashMap<>();
-    private final ReplicationService replicationService;
+    private final ConcurrentHashMap<String, Payload> dataStore = new ConcurrentHashMap<>();
 
-    @Autowired
-    public BigoService(ReplicationService replicationService) {
-        this.replicationService = replicationService;
-    }
-
-    public void saveData(String locationId, Payload payload, boolean shouldReplicateToOthers) {
-        AbstractMap.SimpleEntry<Integer, Payload> existing = dataStore.get(locationId);
-        int currentCount = existing != null ? existing.getKey() : 0;
-        int newCount = currentCount + 1;
+    public Payload saveData(String locationId, Payload payload) {
+        Payload existing = dataStore.get(locationId);
+        int currentCount = existing != null ? existing.getModificationCount() : 0;
 
         // Create a new Payload object and copy properties
         Payload updatedPayload = new Payload();
@@ -30,16 +21,18 @@ public class BigoService {
         updatedPayload.setSeismicActivity(payload.getSeismicActivity());
         updatedPayload.setTemperatureC(payload.getTemperatureC());
         updatedPayload.setRadiationLevel(payload.getRadiationLevel());
-        updatedPayload.setName(payload.getName());
+        updatedPayload.setModificationCount(currentCount + 1);
 
-        dataStore.put(locationId, new AbstractMap.SimpleEntry<>(newCount, updatedPayload));
-        if(shouldReplicateToOthers) {
-            replicationService.replicateData(locationId, updatedPayload);
-        }
-        System.out.println("Saved data for location [" + locationId + "] with modification count [" + newCount + "]");
+        dataStore.put(locationId, updatedPayload);
+
+        return updatedPayload;
     }
 
-    public AbstractMap.SimpleEntry<Integer, Payload> getData(String locationId) {
+    public void saveDataToMap(String locationId, Payload payload) {
+        dataStore.put(locationId, payload);
+    }
+
+    public Payload getData(String locationId) {
         return dataStore.get(locationId);
     }
 }

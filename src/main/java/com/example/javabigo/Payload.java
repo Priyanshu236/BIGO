@@ -16,6 +16,7 @@ public class Payload {
     @JsonProperty("radiation_level")
     private String radiationLevel;
 
-    private String name;
+    @JsonProperty("modification_count")
+    private int modificationCount;
 }
 
