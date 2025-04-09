@@ -45,7 +45,7 @@ public class HelloController {
 
     @PutMapping("/{locationId}")
     public ResponseEntity<Void> saveData(@PathVariable String locationId, @RequestBody Payload payload) {
-        replicationService.saveData(locationId, payload, true);
+        replicationService.saveData(locationId, payload);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
@@ -59,12 +59,5 @@ public class HelloController {
         response.put("radiation_level", result.getRadiationLevel());
         response.put("location_id", locationId);
         return response;
-    }
-
-    @PutMapping("/replicate/{locationId}")
-    public ResponseEntity<Void> replicateData(@PathVariable String locationId, @RequestBody Payload payload) {
-        // Save the data without triggering further replication
-        replicationService.saveData(locationId, payload, false);
-        return ResponseEntity.ok().build();
     }
 }

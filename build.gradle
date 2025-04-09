@@ -35,6 +35,9 @@ dependencies {
     testAnnotationProcessor("org.projectlombok:lombok:1.18.38")
     implementation("org.apache.httpcomponents:httpclient:4.5.13")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
+    compileOnly('com.google.zxing:core:1.7')
+
+
 }
 
 tasks.named('test') {
