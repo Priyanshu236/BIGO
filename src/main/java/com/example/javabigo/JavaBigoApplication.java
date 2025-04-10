@@ -2,21 +2,24 @@ package com.example.javabigo;
 
 import com.example.javabigo.erasure.ReedSolomon;
 import com.example.javabigo.service.PayloadCodec;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import java.util.Arrays;
+import java.util.UUID;
 
 @SpringBootApplication
 public class JavaBigoApplication {
 
 	public static void main(String[] args) {
+        Double tmp = 4.000002;
         SpringApplication.run(JavaBigoApplication.class, args);
         Payload payload = new Payload();
-        payload.setId("22");
-        payload.setSeismicActivity("22");
-        payload.setTemperatureC("22");
-        payload.setRadiationLevel("22");
+        payload.setId(UUID.randomUUID().toString());
+        payload.setSeismicActivity(tmp.toString());
+        payload.setTemperatureC(tmp.toString());
+        payload.setRadiationLevel(tmp.toString());
         payload.setModificationCount(3);
 
         PayloadCodec codec = new PayloadCodec();

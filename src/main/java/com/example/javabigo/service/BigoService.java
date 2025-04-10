@@ -19,4 +19,8 @@ public class BigoService {
     public byte[] getData(String locationId) {
         return dataStore.get(locationId);
     }
+
+    public long mapKeysCount() {
+        return dataStore.mappingCount();
+    }
 }
