@@ -14,6 +14,7 @@ import java.util.Map;
 public class HelloController {
 
     private final ReplicationService replicationService;
+    int reqCnt = 0;
     @Autowired
     public HelloController(ReplicationService service) {
         this.replicationService = service;
@@ -44,6 +45,7 @@ public class HelloController {
 
     @PutMapping("/{locationId}")
     public ResponseEntity<Void> saveData(@PathVariable String locationId, @RequestBody Payload payload) {
+        reqCnt += 1;
         replicationService.saveData(locationId, payload);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
@@ -51,7 +53,7 @@ public class HelloController {
     @GetMapping("/entries/count")
     public ResponseEntity<?> getCount() {
         long result = replicationService.getMapEntriesCount();
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(reqCnt + " : " + result);
     }
 
     private static Map<String, Object> generateResponse(String locationId, Payload result) {

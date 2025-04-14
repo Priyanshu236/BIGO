@@ -74,26 +74,49 @@ public class ReplicationService {
 
     public Payload getData(String locationId) {
         byte[][] shards = new byte[PayloadCodec.TOTAL_SHARDS][];
+        byte[] currentShard = bigoService.getData(locationId);
+        if(currentShard == null) {
+            return null;
+        }
+        shards[nodesIndex.get(currentNodeIp)] = currentShard;
 
-        shards[nodesIndex.get(currentNodeIp)] = bigoService.getData(locationId);
-        // Collect shards from all nodes
         for (String peerIp : peerNodeIps) {
             String requestId = UUID.randomUUID().toString();
-            fetchShardFromNode(peerIp, locationId, requestId);
+            Socket peerSocket = peerConnections.get(peerIp);
 
-            while (requestedShardsResponse.get(requestId) == null) {
+            if(peerSocket == null || peerSocket.isClosed()) {
+                shards[nodesIndex.get(peerIp)] = null;
+                continue;
             }
-            shards[nodesIndex.get(peerIp)] = requestedShardsResponse.get(requestId);
-            requestedShardsResponse.remove(requestId);
+
+            try {
+                fetchShardFromNode(peerIp, locationId, requestId);
+                int timeout = 500; // 0.5-second timeout
+                int waited = 0;
+                while (requestedShardsResponse.get(requestId) == null && waited < timeout) {
+                    Thread.sleep(10);
+                    waited += 10;
+                }
+                if (waited >= timeout) {
+                    shards[nodesIndex.get(peerIp)] = null;
+                    peerConnections.remove(peerIp); // Mark connection as invalid
+                } else {
+                    shards[nodesIndex.get(peerIp)] = requestedShardsResponse.get(requestId);
+                }
+                requestedShardsResponse.remove(requestId);
+            } catch (Exception e) {
+                shards[nodesIndex.get(peerIp)] = null;
+                peerConnections.remove(peerIp);
+            }
         }
 
         try {
             return payloadCodec.decode(shards);
         } catch (IOException e) {
-            System.err.println("decode messed up");
             throw new RuntimeException("Decoding failed", e);
         }
     }
+
 
     private void saveIndividualShard(String locationId, byte[] payload) {
         bigoService.saveData(locationId, payload);
@@ -190,7 +213,6 @@ public class ReplicationService {
                 byte[] shard = bigoService.getData(locationId);
 
                 String response = "RESP:" + Base64.getEncoder().encodeToString(shard) + ":" + requestId+'\n';
-                System.out.println("request id _ " + requestId);
                 socket.getOutputStream().write(response.getBytes());
                 socket.getOutputStream().flush();
             } catch (IOException e) {
@@ -200,7 +222,6 @@ public class ReplicationService {
             String[] parts = message.split(":", 3);
             String shardStr = parts[1];
             String requestId = parts[2];
-            System.out.println("request id _ " + requestId);
             requestedShardsResponse.put(requestId, Base64.getDecoder().decode(shardStr));
         } else {
             peerConnections.put(message, socket);
@@ -208,21 +229,6 @@ public class ReplicationService {
         }
 
     }
-
-//    private String getClientReportedIp(InputStream inputStream) {
-//        try {
-//            byte[] buffer = new byte[4096];
-//            int bytesRead;
-//
-//            while ((bytesRead = inputStream.read(buffer)) != -1) {
-//                return new String(buffer, 0, bytesRead);
-//            }
-//        } catch (IOException e) {
-//            System.err.println("Error reading client-reported IP: " + e.getMessage());
-//            return "unknown";
-//        }
-//        return "";
-//    }
 
     private void fetchShardFromNode(String nodeIp, String locationId, String requestId) {
         Socket socket = peerConnections.get(nodeIp);
