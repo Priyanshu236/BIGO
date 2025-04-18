@@ -8,15 +8,15 @@ public class Payload {
     private String id;
 
     @JsonProperty("seismic_activity")
-    private String seismicActivity;
+    private Double seismicActivity;
 
     @JsonProperty("temperature_c")
-    private String temperatureC;
+    private Double temperatureC;
 
     @JsonProperty("radiation_level")
-    private String radiationLevel;
+    private Double radiationLevel;
 
     @JsonProperty("modification_count")
-    private int modificationCount;
+    private int modificationCount = 1;
 }
 

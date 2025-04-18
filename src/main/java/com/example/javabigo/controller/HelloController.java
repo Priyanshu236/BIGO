@@ -9,12 +9,14 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @RestController
 public class HelloController {
 
     private final ReplicationService replicationService;
-    int reqCnt = 0;
+    private final AtomicInteger reqCnt = new AtomicInteger(0);
+
     @Autowired
     public HelloController(ReplicationService service) {
         this.replicationService = service;
@@ -22,7 +24,7 @@ public class HelloController {
 
     @GetMapping("/{locationId}")
     public ResponseEntity<?> getData(@PathVariable String locationId) {
-        if(locationId.equals("health")) {
+        if (locationId.equals("health")) {
             //return 200
             return new ResponseEntity<>(HttpStatus.OK);
         }
@@ -45,7 +47,7 @@ public class HelloController {
 
     @PutMapping("/{locationId}")
     public ResponseEntity<Void> saveData(@PathVariable String locationId, @RequestBody Payload payload) {
-        reqCnt += 1;
+        reqCnt.incrementAndGet();
         replicationService.saveData(locationId, payload);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
@@ -53,7 +55,7 @@ public class HelloController {
     @GetMapping("/entries/count")
     public ResponseEntity<?> getCount() {
         long result = replicationService.getMapEntriesCount();
-        return ResponseEntity.ok(reqCnt + " : " + result);
+        return ResponseEntity.ok(reqCnt.get() + " : " + result);
     }
 
     private static Map<String, Object> generateResponse(String locationId, Payload result) {

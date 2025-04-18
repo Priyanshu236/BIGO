@@ -17,9 +17,9 @@ public class JavaBigoApplication {
         SpringApplication.run(JavaBigoApplication.class, args);
         Payload payload = new Payload();
         payload.setId(UUID.randomUUID().toString());
-        payload.setSeismicActivity(tmp.toString());
-        payload.setTemperatureC(tmp.toString());
-        payload.setRadiationLevel(tmp.toString());
+        payload.setSeismicActivity(tmp);
+        payload.setTemperatureC(tmp);
+        payload.setRadiationLevel(tmp);
         payload.setModificationCount(3);
 
         PayloadCodec codec = new PayloadCodec();
