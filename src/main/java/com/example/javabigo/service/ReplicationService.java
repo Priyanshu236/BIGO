@@ -1,7 +1,6 @@
 package com.example.javabigo.service;
 
 import com.example.javabigo.Payload;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -11,6 +10,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -24,7 +24,6 @@ public class ReplicationService {
     private Map<String, byte[]> requestedShardsResponse = new ConcurrentHashMap<>();
     private Map<String, Integer> nodesIndex = new HashMap<>();
     private PayloadCodec payloadCodec = new PayloadCodec();
-    ObjectMapper mapper = new ObjectMapper();
 
     @Autowired
     public ReplicationService(BigoService bigoService, @Value("${current.node.ip}") String currentNodeIp,
@@ -80,35 +79,40 @@ public class ReplicationService {
         }
         shards[nodesIndex.get(currentNodeIp)] = currentShard;
 
+        Map<String, CompletableFuture<Void>> futures = new HashMap<>();
+
+        // Make all requests at once
         for (String peerIp : peerNodeIps) {
             String requestId = UUID.randomUUID().toString();
             Socket peerSocket = peerConnections.get(peerIp);
 
-            if(peerSocket == null || peerSocket.isClosed()) {
+            if(peerSocket == null) {
                 shards[nodesIndex.get(peerIp)] = null;
                 continue;
             }
 
-            try {
-                fetchShardFromNode(peerIp, locationId, requestId);
-                int timeout = 500; // 0.5-second timeout
-                int waited = 0;
-                while (requestedShardsResponse.get(requestId) == null && waited < timeout) {
-                    Thread.sleep(10);
-                    waited += 10;
-                }
-                if (waited >= timeout) {
-                    shards[nodesIndex.get(peerIp)] = null;
-                    peerConnections.remove(peerIp); // Mark connection as invalid
-                } else {
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                try {
+                    fetchShardFromNode(peerIp, locationId, requestId);
+                    while (requestedShardsResponse.get(requestId) == null) {
+                        if(peerSocket.isClosed() || !peerSocket.isConnected()) {
+                            shards[nodesIndex.get(peerIp)] = null;
+                            peerConnections.remove(peerIp);
+                            break;
+                        }
+                    }
                     shards[nodesIndex.get(peerIp)] = requestedShardsResponse.get(requestId);
+                    requestedShardsResponse.remove(requestId);
+                } catch (Exception e) {
+                    shards[nodesIndex.get(peerIp)] = null;
+                    peerConnections.remove(peerIp);
                 }
-                requestedShardsResponse.remove(requestId);
-            } catch (Exception e) {
-                shards[nodesIndex.get(peerIp)] = null;
-                peerConnections.remove(peerIp);
-            }
+            });
+
+            futures.put(requestId, future);
         }
+        CompletableFuture[] futureArray = futures.values().toArray(new CompletableFuture[futures.size()]);
+        CompletableFuture.allOf(futureArray).join();
 
         try {
             return payloadCodec.decode(shards);
@@ -116,6 +120,7 @@ public class ReplicationService {
             throw new RuntimeException("Decoding failed", e);
         }
     }
+
 
 
     private void saveIndividualShard(String locationId, byte[] payload) {
@@ -136,7 +141,6 @@ public class ReplicationService {
                 Socket socket = new Socket(peerIp, SOCKET_PORT);
                 peerConnections.put(peerIp, socket);
                 socket.getOutputStream().write((currentNodeIp +'\n').getBytes());//echo back my ip
-                socket.getOutputStream().flush();
                 listenToSocket(socket);
             } catch (IOException e) {
                 System.err.println("Could not connect to " + peerIp + ": " + e.getMessage());
@@ -166,7 +170,6 @@ public class ReplicationService {
                 OutputStream outputStream = socket.getOutputStream();
                 String message = "STORE:" + locationId + ":" + Base64.getEncoder().encodeToString(shard) + "\n";
                 outputStream.write(message.getBytes());
-                outputStream.flush();
             } catch (IOException e) {
                 System.err.println("Error when sending message to " + socket.getInetAddress().getHostAddress() + ": " + e.getMessage());
             }
@@ -214,7 +217,6 @@ public class ReplicationService {
 
                 String response = "RESP:" + Base64.getEncoder().encodeToString(shard) + ":" + requestId+'\n';
                 socket.getOutputStream().write(response.getBytes());
-                socket.getOutputStream().flush();
             } catch (IOException e) {
                 System.err.println("Failed to handle fetch request");
             }
@@ -236,7 +238,6 @@ public class ReplicationService {
         try {
             String request = "FETCH:" + locationId + ":" + requestId+'\n';
             socket.getOutputStream().write(request.getBytes());
-            socket.getOutputStream().flush();
         } catch (IOException e) {
             System.err.println("Fetch failed from " + nodeIp);
         }
