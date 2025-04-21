@@ -24,6 +24,7 @@ public class ReplicationService {
     private final Map<String, Socket> peerConnections = new ConcurrentHashMap<>();
     private final Map<String, byte[]> requestedShardsResponse = new ConcurrentHashMap<>();
     private final PayloadCodec payloadCodec = new PayloadCodec();
+    int cnt = 0;
 
     @Autowired
     public ReplicationService(BigoService bigoService, @Value("${current.node.ip}") String currentNodeIp,
@@ -54,7 +55,9 @@ public class ReplicationService {
                 System.err.println("Error encoding data: " + e.getMessage());
             }
         } else {
-            Payload prevData = getData(locationId);
+            cnt++;
+            System.out.println("Replication found for " + locationId + ". Total Replicated requests -> " + cnt);
+            Payload prevData = getData(locationId, true);
             payload.setModificationCount(prevData.getModificationCount() + 1);
             try {
                 shardAndReplicateData(locationId, payload);
@@ -71,17 +74,17 @@ public class ReplicationService {
     }
 
 
-    public Payload getData(String locationId) {
-        byte[][] shards = new byte[PayloadCodec.TOTAL_SHARDS][];
+    public Payload getData(String locationId, boolean isWriting) {
+        byte[][] shards = new byte[7][];
         byte[] currentShard = bigoService.getData(locationId);
         if (currentShard == null) {
+            System.out.println("Shard not saved in node");
             return null;
         }
         shards[nodesIndex.get(currentNodeIp)] = currentShard;
 
         Map<String, CompletableFuture<Void>> futures = new HashMap<>();
 
-        // Make all requests at once
         for (String peerIp : peerNodeIps) {
             String requestId = UUID.randomUUID().toString();
             Socket peerSocket = peerConnections.get(peerIp);
@@ -93,9 +96,12 @@ public class ReplicationService {
 
             CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
                 try {
-                    fetchShardFromNode(peerIp, locationId, requestId);
+                    fetchShardFromNode(peerSocket, locationId, requestId);
+                    long startTime = System.currentTimeMillis();
+                    long timeout = 500;
+
                     while (requestedShardsResponse.get(requestId) == null) {
-                        if (peerSocket.isClosed() || !peerSocket.isConnected()) {
+                        if (!isWriting && peerConnections.size() != 7 && System.currentTimeMillis() - startTime > timeout) {
                             shards[nodesIndex.get(peerIp)] = null;
                             peerConnections.remove(peerIp);
                             break;
@@ -190,6 +196,11 @@ public class ReplicationService {
     }
 
     private void processReceivedMessage(String message, Socket socket) {
+        if (Objects.equals(message, "")) {
+            System.out.println("Received empty message");
+            return;
+        }
+
         if (message.startsWith("STORE:")) {
             // Split the message into components
             String[] parts = message.split(":", 3);
@@ -231,14 +242,13 @@ public class ReplicationService {
 
     }
 
-    private void fetchShardFromNode(String nodeIp, String locationId, String requestId) {
-        Socket socket = peerConnections.get(nodeIp);
+    private void fetchShardFromNode(Socket socket, String locationId, String requestId) {
 
         try {
             String request = "FETCH:" + locationId + ":" + requestId + '\n';
             socket.getOutputStream().write(request.getBytes());
         } catch (IOException e) {
-            System.err.println("Fetch failed from " + nodeIp);
+            System.err.println("Fetch failed");
         }
     }
 

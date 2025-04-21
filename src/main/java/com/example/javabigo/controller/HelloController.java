@@ -29,7 +29,7 @@ public class HelloController {
             return new ResponseEntity<>(HttpStatus.OK);
         }
         try {
-            Payload result = replicationService.getData(locationId);
+            Payload result = replicationService.getData(locationId, false);
 
             if (result == null) {
                 System.out.println("Data not found");
