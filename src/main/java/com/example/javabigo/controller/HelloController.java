@@ -65,7 +65,6 @@ public class HelloController {
     public ResponseEntity<Void> saveData(@PathVariable String locationId, @RequestBody Payload payload) {
 
         if (!currentNodeIp.equals(firstNodeIp)) {
-            String firstServerIp = firstNodeIp;
             String firstNodeUrl = redirectUrl + locationId;
 
             HttpHeaders headers = new HttpHeaders();

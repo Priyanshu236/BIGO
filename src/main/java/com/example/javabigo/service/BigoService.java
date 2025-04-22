@@ -1,5 +1,6 @@
 package com.example.javabigo.service;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
@@ -7,18 +8,16 @@ import org.springframework.stereotype.Service;
 @Service
 public class BigoService {
 
-    private final ConcurrentHashMap<String, DataEntry> dataStore = new ConcurrentHashMap<>();
+    private final Map<String, DataEntry> dataStore = new ConcurrentHashMap<>();
 
     public void saveData(String locationId, byte[] shard) {
-        dataStore.compute(locationId, (key, existingEntry) -> {
-            if (existingEntry == null) {
-                return new DataEntry(shard, 1);
-            } else {
-                existingEntry.shard = shard;
-                existingEntry.incrementModificationCount();
-                return existingEntry;
-            }
-        });
+        DataEntry existingEntry = dataStore.get(locationId);
+        if (existingEntry == null) {
+            dataStore.put(locationId, new DataEntry(shard, 1));
+        } else {
+            existingEntry.shard = shard;
+            existingEntry.incrementModificationCount();
+        }
     }
 
     public byte[] getShardOf(String locationId) {
@@ -31,13 +30,13 @@ public class BigoService {
         return entry != null ? entry.modificationCount : 0;
     }
 
-    public long mapKeysCount() {
-        return dataStore.mappingCount();
+    public int mapKeysCount() {
+        return dataStore.size();
     }
 
-    private class DataEntry {
+    private static class DataEntry {
         private byte[] shard;
-        int modificationCount;
+        private int modificationCount;
 
         public DataEntry(byte[] shard, int modificationCount) {
             this.shard = shard;

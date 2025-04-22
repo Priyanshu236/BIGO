@@ -12,10 +12,13 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 @Service
 public class ReplicationService {
+
+    private final ConcurrentHashMap<String, ReentrantLock> lockMap = new ConcurrentHashMap<>();
     private final List<String> peerNodeIps;
     private final Map<String, Integer> nodesIndex = new HashMap<>();
     private final String currentNodeIp;
@@ -24,7 +27,6 @@ public class ReplicationService {
     private final Map<String, Socket> peerConnections = new ConcurrentHashMap<>();
     private final Map<String, byte[]> requestedShardsResponse = new ConcurrentHashMap<>();
     private final PayloadCodec payloadCodec = new PayloadCodec();
-    int cnt = 0;
 
     @Autowired
     public ReplicationService(BigoService bigoService, @Value("${current.node.ip}") String currentNodeIp,
@@ -48,10 +50,15 @@ public class ReplicationService {
     }
 
     public void saveData(String locationId, Payload payload) {
+        ReentrantLock lock = lockMap.computeIfAbsent(locationId, id -> new ReentrantLock());
+        lock.lock();
         try {
             shardAndReplicateData(locationId, payload);
         } catch (Exception e) {
             System.err.println("Error encoding data: " + e.getMessage());
+        } finally {
+            lock.unlock();
+            lockMap.computeIfPresent(locationId, (id, l) -> l.hasQueuedThreads() ? l : null);
         }
     }
 
@@ -195,6 +202,9 @@ public class ReplicationService {
             if (parts.length >= 3) {
                 String locationId = parts[1];
                 String payloadStr = parts[2];
+
+                ReentrantLock lock = lockMap.computeIfAbsent(locationId, id -> new ReentrantLock());
+                lock.lock();
                 try {
                     byte[] shard = Base64.getDecoder().decode(payloadStr);
                     saveIndividualShard(locationId, shard);
@@ -202,6 +212,8 @@ public class ReplicationService {
                     System.out.println("payload str _ " + payloadStr);
                     System.err.println(message);
                     System.err.println("Failed to parse payload: " + e.getMessage());
+                } finally {
+                    lockMap.computeIfPresent(locationId, (id, l) -> l.hasQueuedThreads() ? l : null);
                 }
             } else {
                 System.err.println("Invalid message format: " + message);
