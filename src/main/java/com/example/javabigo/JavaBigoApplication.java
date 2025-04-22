@@ -20,7 +20,6 @@ public class JavaBigoApplication {
         payload.setSeismicActivity(tmp);
         payload.setTemperatureC(tmp);
         payload.setRadiationLevel(tmp);
-        payload.setModificationCount(3);
 
         PayloadCodec codec = new PayloadCodec();
 

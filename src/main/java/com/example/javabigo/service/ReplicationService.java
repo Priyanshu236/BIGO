@@ -48,22 +48,10 @@ public class ReplicationService {
     }
 
     public void saveData(String locationId, Payload payload) {
-        if (bigoService.getData(locationId) == null) {
-            try {
-                shardAndReplicateData(locationId, payload);
-            } catch (Exception e) {
-                System.err.println("Error encoding data: " + e.getMessage());
-            }
-        } else {
-            cnt++;
-            System.out.println("Replication found for " + locationId + ". Total Replicated requests -> " + cnt);
-            Payload prevData = getData(locationId, true);
-            payload.setModificationCount(prevData.getModificationCount() + 1);
-            try {
-                shardAndReplicateData(locationId, payload);
-            } catch (Exception e) {
-                System.err.println("Error encoding data: " + e.getMessage());
-            }
+        try {
+            shardAndReplicateData(locationId, payload);
+        } catch (Exception e) {
+            System.err.println("Error encoding data: " + e.getMessage());
         }
     }
 
@@ -76,7 +64,7 @@ public class ReplicationService {
 
     public Payload getData(String locationId, boolean isWriting) {
         byte[][] shards = new byte[7][];
-        byte[] currentShard = bigoService.getData(locationId);
+        byte[] currentShard = bigoService.getShardOf(locationId);
         if (currentShard == null) {
             System.out.println("Shard not saved in node");
             return null;
@@ -223,7 +211,7 @@ public class ReplicationService {
                 String[] parts = message.split(":", 3);
                 String locationId = parts[1];
                 String requestId = parts[2];
-                byte[] shard = bigoService.getData(locationId);
+                byte[] shard = bigoService.getShardOf(locationId);
 
                 String response = "RESP:" + Base64.getEncoder().encodeToString(shard) + ":" + requestId + '\n';
                 socket.getOutputStream().write(response.getBytes());
@@ -239,7 +227,6 @@ public class ReplicationService {
             peerConnections.put(message, socket);
             System.out.println("Connection established: " + currentNodeIp + " - " + message);
         }
-
     }
 
     private void fetchShardFromNode(Socket socket, String locationId, String requestId) {

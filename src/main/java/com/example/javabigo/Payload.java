@@ -15,8 +15,5 @@ public class Payload {
 
     @JsonProperty("radiation_level")
     private Double radiationLevel;
-
-    @JsonProperty("modification_count")
-    private int modificationCount = 1;
 }
 
