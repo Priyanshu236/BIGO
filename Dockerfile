@@ -27,10 +27,9 @@ COPY --from=builder /app/build/libs/JavaBIGO-0.0.1-SNAPSHOT.jar app.jar
 # Set environment variables (can be overridden when running)
 ENV CURRENT_NODE_IP=127.0.0.1
 ENV ALL_NODE_IPS=127.0.0.1
-ENV SERVER_PORT=4001
+ENV PORT=4001
 
 # Expose the default port (you can change this if needed)
-EXPOSE 4001
 
 # Start the application with environment variables
-ENTRYPOINT ["sh", "-c", "java -DSERVER_PORT=$SERVER_PORT -DCURRENT_NODE_IP=$CURRENT_NODE_IP -DALL_NODE_IPS=$ALL_NODE_IPS -jar app.jar"]
+ENTRYPOINT ["sh", "-c", "java -DSERVER_PORT=$PORT -DCURRENT_NODE_IP=$CURRENT_NODE_IP -DALL_NODE_IPS=$ALL_NODE_IPS -jar app.jar"]
