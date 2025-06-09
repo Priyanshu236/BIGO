@@ -28,7 +28,9 @@ COPY --from=builder /app/build/libs/JavaBIGO-0.0.1-SNAPSHOT.jar app.jar
 ENV CURRENT_NODE_IP=127.0.0.1
 ENV ALL_NODE_IPS=127.0.0.1
 ENV PORT=4001
-
+EXPOSE ${PORT}
+#socket port
+EXPOSE 8089
 # Expose the default port (you can change this if needed)
 
 # Start the application with environment variables
